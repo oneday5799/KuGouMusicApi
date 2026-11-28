@@ -316,6 +316,8 @@ $ set HOST=127.0.0.1 && npm run dev
 
 #### 更新记录
 
+26-11-29：`概念版听歌等级榜（含听歌经验倍率）` 支持本地构造请求体（还原 H5 页脚本加密），仅需登录态即可调用，无需客户端密文；新增 `rank_type` / `page` / `page_size` 参数，旧密文透传用法保留兼容
+
 26-11-28：添加 `概念版听歌等级榜（含听歌经验倍率）`、`概念版会员结构查询（v1，含成长值）` 接口；新增 `概念版会员体系与听歌经验倍率速查` 说明
 
 26-11-24：`发现页推荐卡片（批量代理）` 支持 `full` 拉全与 `bi_index`/`label`/`album_playlist` 透传；`发现页单卡片推荐` 支持全部 14 张卡片 ID 并透传专用卡参数；修正 `card_size`/`listen` 端点行为说明（`card_size` 超 3 不报错；`listen` 不携带 `card_size`/`card_rank`/`ufeature`，单轮最多 12 个响应）；长音频 `album_playlist` 支持 JSON 字符串
@@ -4189,30 +4191,34 @@ curl -X POST http://127.0.0.1:3000/video/barrage/send \
 
 说明：获取概念版「我的 → 听歌等级」页的榜单（全球年榜 / 省月榜 / 市周榜）与本人听歌经验倍率。登录后调用。
 
-!> 该接口请求体由概念版客户端本地加密生成（`p` / `params` 两个密文字段），本项目无法构造，需从概念版客户端的真实请求体中获取后传入；密文绑定请求时间戳，有时效性，获取后请尽快调用。响应为明文 JSON，不受影响。
-
-**必选参数：**
-
-`p`：客户端请求体中的 `p` 密文（hex 字符串）
-
-`params`：客户端请求体中的 `params` 密文（hex 字符串）
+!> 接口来自概念版内嵌 H5 页（mobileCallProtocol 请求族），请求体加密已完整还原，本项目可本地构造 `p` / `params`，只需登录态即可调用（无需客户端密文）。`userid` 必须与 `token` 所属账号一致（否则 `error_code=20018`）；`mid` / `uuid` / `dfid` 服务端不做强校验。
 
 **可选参数：**
 
-`userid`：用户 id（默认取 cookie 的 `userid`，需与密文内的 userid 一致）
+`rank_type`：榜单类型，`2`=全球年榜（默认）、`3`=省月榜、`4`=市周榜
+
+`page`：页码（默认 1）
+
+`page_size`：每页条数（默认 30，客户端页面使用 100）
+
+`userid`：用户 id（默认取 cookie 的 `userid`，必须与 token 所属账号一致）
+
+`mid` / `dfid`：设备标识（默认取 cookie，可不传）
 
 `kg_devid`：透传客户端请求头 `KG-DEVID`（设备绑定串，可提高请求成功率）
 
+`p` / `params`：旧用法兼容，传客户端密文则整体透传（一般无需使用）
+
 **接口地址：** `/youth/listen/level/rank`
 
-**调用例子：** `/youth/listen/level/rank?cookie=token%3Dxxx%3Buserid%3D123&p=<密文>&params=<密文>`
+**调用例子：** `/youth/listen/level/rank?cookie=token%3Dxxx%3Buserid%3D123&rank_type=3&page_size=100`
 
 响应要点：
 
 - `p_speed_info`：倍率档位表 `{p0:"1", p1:"1.5", p2:"2", p3:"2.5"}`，随每份响应下发
 - `p_speed`：本人当前倍率（字符串）；`rank_list[]` 每个条目带各自的 `p_speed` 与完整 `vipinfo`
 - `rank_percent`：本人排名百分位，对应页面「TOP xx%」角标（如 `43` → `TOP43%`），随榜单而异；配套 `rank_distance`（距榜首分数差）、`rank`、`province_id`/`city_id`（行政区划）
-- 三个榜单的识别：全球年榜 `total` 1000（top 分数量级十万+）、省月榜 / 市周榜 `total` 100（top 分数量级递减）；响应 `rank_type` 不足以单独区分榜单，建议结合首条目与分数总量判断
+- 三个榜单的识别：全球年榜 `total` 1000（top 分数量级十万+）、省月榜 / 市周榜 `total` 100（top 分数量级递减）；响应 `rank_type` 不足以单独区分榜单，建议结合首条目与分数总量判断。H5 页面本人排名横幅文案写作「你的听歌数据在全球月排名」，与页面 tab 标签「全球年榜」及 tab key `globalYear` 不一致，属产品文案笔误，以 tab 定义为准
 - 响应中大量 `"total":500` 是概念版会员的 `vip_limit_quota`（每日配额），与榜单 `total` 无关
 - 等级线字段：`p_grade` / `p_grade_point` / `p_current_grade_min` / `p_next_grade` / `p_next_grade_point` / `p_next_grade_min` / `p_remain_grade_min`
 - `point`（各榜上榜分数快照）与 `p_current_point`（实时听歌值）分离；`duration` 为播放时长统计，独立于倍率

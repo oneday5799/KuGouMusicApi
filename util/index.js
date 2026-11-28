@@ -23,6 +23,7 @@ const {
   cryptoRSAEncrypt,     // RSA 加密
   cryptoSha1,           // SHA1 哈希
   rsaEncrypt2,          // RSA 加密 v2（用于 register_dev 等接口）
+  cryptoH5RsaEncryptHex,// H5 概念版页面脚本的 RSA 加密（自定义 PKCS1 块布局）
   playlistAesEncrypt,   // 歌单 AES 加密
   playlistAesDecrypt,   // 歌单 AES 解密
   publicLiteRasKey,     // 概念版 RSA 公钥
@@ -77,6 +78,7 @@ module.exports = {
   cryptoRSAEncrypt,             // RSA 加密
   cryptoSha1,                   // SHA1 哈希
   rsaEncrypt2,                  // RSA 加密 v2
+  cryptoH5RsaEncryptHex,        // H5 概念版页面脚本 RSA 加密（自定义 PKCS1 块布局）
   playlistAesEncrypt,           // 歌单 AES 加密
   playlistAesDecrypt,           // 歌单 AES 解密
 

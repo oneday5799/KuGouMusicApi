@@ -269,6 +269,49 @@ function rsaEncrypt2(data) {
   return forge.util.bytesToHex(encrypted);
 }
 
+// 概念版 H5 页面脚本（kg-rsa）内嵌的 RSA 公钥模数（1024-bit，hex），
+// 与 APP 端 publicRasKey / publicLiteRasKey 均不同，仅用于 H5 mobileCallProtocol 端点族的 p 字段
+const h5ConceptRsaModulusHex =
+  'B1B1EC76A1BBDBF0D18E8CD9A87E53FA3881E2F004C67C9DDA2CA677DBEFA3D61' +
+  'DF8463FE12D84FF4B4699E02C9D41CAB917F5A8FB9E35580C4BDF97763A0420A4' +
+  '76295D763EE10174E6F9EBF7DF8A77BA5B20CDA4EE705DEF5BBA3C88567B9656E' +
+  '52C9CD5CD95CA735FF2D25F762B133273EEEB7B4F3EA8B6DA29040F3B67CD';
+
+/**
+ * 概念版 H5 页面脚本（kg-rsa）的 RSA 加密，输出定长 256 位小写 hex
+ *
+ * 其 "PKCS1Padding" 是自定义块布局（非标准 PKCS#1 v1.5）：
+ *   block[0..m-1]      = 明文字节反转
+ *   block[m]           = 0x00
+ *   block[m+1..125]    = 随机非零字节
+ *   block[126]         = 0x02
+ *   block[127]         = 0x00
+ * 之后把块按小端装配成整数做 raw RSA（m^e mod n）。
+ * 实测服务端对标准 PKCS#1 v1.5 与此自定义布局当前均接受，但为与客户端 H5 原实现
+ * 逐字节一致（已做同随机序列对拍验证），按原布局实现。
+ * @param {BufferLike} data
+ * @returns {string} hex
+ */
+function cryptoH5RsaEncryptHex(data) {
+  const buffer = normalizeBuffer(data);
+  if (buffer.length > 117) throw new Error('Data length exceeds RSA-1024 block (117 bytes)');
+  const block = new Uint8Array(128);
+  for (let i = 0; i < buffer.length; i++) block[buffer.length - 1 - i] = buffer[i];
+  for (let i = buffer.length; i < 128; i++) {
+    let byte = 0;
+    while (byte === 0) byte = (Math.random() * 256) | 0;
+    block[i] = byte;
+  }
+  block[buffer.length] = 0x00;
+  block[126] = 0x02;
+  block[127] = 0x00;
+  const n = new forge.jsbn.BigInteger(h5ConceptRsaModulusHex, 16);
+  const e = new forge.jsbn.BigInteger('10001', 16);
+  // 小端装配：整数的大端 hex 即字节序反转
+  const message = new forge.jsbn.BigInteger(uint8ArrayToHex(block.reverse()), 16);
+  return message.modPow(e, n).toString(16).padStart(256, '0');
+}
+
 function playlistAesEncrypt(data) {
   const useData = typeof data === 'object' ? JSON.stringify(data) : data;
   const key = randomString(6).toLowerCase();
@@ -312,6 +355,7 @@ module.exports = {
   cryptoSha1,
   playlistAesEncrypt,
   playlistAesDecrypt,
+  cryptoH5RsaEncryptHex,
   publicLiteRasKey,
   publicRasKey,
   wordArrayFromBuffer,
